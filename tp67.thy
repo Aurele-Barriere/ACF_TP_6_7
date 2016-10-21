@@ -275,9 +275,27 @@ where
 "san4 (If b s1 s2) = (if noVarEvalCond(b) = None then (san4 s1 \<and> san4 s2) else (if noVarEvalCond(b) = Some True then san4 s1 else san4 s2))" |
 "san4 _ = True"
 
+
+
+
+
+
+
+fun noVarEvalCond2::"condition \<Rightarrow> bool option"
+where
+"noVarEvalCond2 (Eq c1 c2) = (if c1 = c2 then Some True else (optionOp ((noVarEval c1), (noVarEval c2), (\<lambda> a b . a = b))))" 
+
+fun san5::"statement \<Rightarrow> bool"
+where
+"san5 (Exec e) = (if (noVarEval(e) = Some 0 \<or> noVarEval(e) = None) then False else True)" |
+"san5 (Seq h t) = (san5 h \<and> san5 t)" |
+"san5 (If b s1 s2) = (if noVarEvalCond2(b) = None then (san5 s1 \<and> san5 s2) else (if noVarEvalCond2(b) = Some True then san5 s1 else san5 s2))" |
+"san5 _ = True"
+
+
 fun safe::"statement \<Rightarrow> bool"
 where
-"safe s = san4 s"
+"safe s = san5 s"
 
 
 
