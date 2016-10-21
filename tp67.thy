@@ -1,5 +1,5 @@
 theory tp67
-imports Main  (* "~~/src/HOL/Library/Code_Target_Int" "~~/src/HOL/Library/Code_Char" *)
+imports Main   "~~/src/HOL/Library/Code_Target_Int" "~~/src/HOL/Library/Code_Char" 
 begin
 
 (* Types des expressions, conditions et programmes (statement) *)
@@ -183,10 +183,112 @@ definition "ok14= (Seq (Read ''x'') (Seq (Read ''y'') (If (Eq (Sum (Variable ''x
 
 (* Le TP commence ici! *)
 
+fun inlist::"'a \<Rightarrow> 'a list \<Rightarrow> bool"
+where
+"inlist _ [] = False" |
+"inlist x (h#t) = (if (x=h) then True else inlist x t)"
+
+value "inlist 3 [(1::nat),2,3]"
+value "inlist 0 [(1::nat),1,1]"
+value "inlist 0 []"
+
+fun BAD:: "(symTable * inchan * outchan) \<Rightarrow> bool"
+where
+"BAD (_,_,outl) = (inlist (X 0) outl)"
+
+
+
+value"BAD(evalS p1 ([],[],[]))"
+value"BAD(evalS p2 ([],[],[]))"
+value"BAD(evalS p3 ([],[],[]))"
+value"BAD(evalS p4 ([],[0],[]))"
+value"BAD(evalS bad1 ([],[],[]))"
+value"BAD(evalS ok2 ([],[],[]))"
+
+fun san1::"statement \<Rightarrow> bool"
+where
+"san1 (Exec _) = False" |
+"san1 (Seq h t) = (san1 h \<and> san1 t)" |
+"san1 (If b s1 s2) = (san1 s1 \<and> san1 s2)" |
+"san1 _ = True"
+
+value"san1 p4"
+value"san1 ok2" 
+value"san1 bad5"
+
+fun san2::"statement \<Rightarrow> bool"
+where
+"san2 (Exec (Constant c)) = (if (c=0) then False else True)" |
+"san2 (Exec _) = False" |
+"san2 (Seq h t) = (san2 h \<and> san2 t)" |
+"san2 (If b s1 s2) = (san2 s1 \<and> san2 s2)" |
+"san2 _ = True"
+
+value"san2 p4"
+value"san2 ok2" 
+value"san2 bad5"
+definition "p5= Exec (Constant 42)"
+value"san2 p5"
+
+
+fun optionOp::"('a option * 'a option * ('a \<Rightarrow> 'a \<Rightarrow> 'b)) \<Rightarrow> 'b option"
+where
+"optionOp (None, y, f) = None" |
+"optionOp (x, None, f) = None" |
+"optionOp ((Some a1), (Some a2), f) = (Some (f a1 a2))" 
+
+fun noVarEval::"expression \<Rightarrow> int option"
+where
+"noVarEval (Constant c) = (Some c)" |
+"noVarEval (Variable _) = None" |
+"noVarEval (Sum e1 e2) = (optionOp ((noVarEval e1), (noVarEval e2), (\<lambda> a b . a + b)))" |
+"noVarEval (Sub e1 e2) = (optionOp ((noVarEval e1), (noVarEval e2), (\<lambda> a b . a - b)))"
+
+fun san3::"statement \<Rightarrow> bool"
+where
+"san3 (Exec e) = (if (noVarEval(e) = Some 0 \<or> noVarEval(e) = None) then False else True)" |
+"san3 (Seq h t) = (san3 h \<and> san3 t)" |
+"san3 (If b s1 s2) = (san3 s1 \<and> san3 s2)" |
+"san3 _ = True"
 
 
 
 
+value"san3 p4"
+value"san3 ok2" 
+value"san3 bad2"
+definition "p6= Exec (Sub (Constant 3) (Constant 1) ) "
+value"san3 p5"
+value"san2 p6"
+value"san3 p6"
+
+
+
+fun noVarEvalCond::"condition \<Rightarrow> bool option"
+where
+"noVarEvalCond (Eq c1 c2) = (optionOp ((noVarEval c1), (noVarEval c2), (\<lambda> a b . a = b)))" 
+
+fun san4::"statement \<Rightarrow> bool"
+where
+"san4 (Exec e) = (if (noVarEval(e) = Some 0 \<or> noVarEval(e) = None) then False else True)" |
+"san4 (Seq h t) = (san4 h \<and> san4 t)" |
+"san4 (If b s1 s2) = (if noVarEvalCond(b) = None then (san4 s1 \<and> san4 s2) else (if noVarEvalCond(b) = Some True then san4 s1 else san4 s2))" |
+"san4 _ = True"
+
+fun safe::"statement \<Rightarrow> bool"
+where
+"safe s = san4 s"
+
+
+
+
+lemma correct: "safe p \<longrightarrow> ( \<forall> inlist. ~BAD (evalS p ([], inlist, [])))"  
+nitpick
+sorry
+
+lemma complete:  "( \<forall> inlist. ~BAD (evalS p ([], inlist, []))) \<longrightarrow> safe p"
+nitpick
+oops
 
 (* ----- Restriction de l'export Scala (Isabelle 2014) -------*)
 (* ! ! !  NE PAS MODIFIER ! ! ! *)
@@ -231,8 +333,8 @@ import AutomaticConversion._
 
 (* Directive pour l'exportation de l'analyseur *)
 export_code safe in Scala 
-(* file "~/workspace/TP67/src/tp67/san.scala"   (* à adapter en fonction du chemin de votre projet TP67 *)
-*)
+ file "~/workspace/TP67/src/tp67/san.scala"   (* à adapter en fonction du chemin de votre projet TP67 *)
+
 
 
 end
