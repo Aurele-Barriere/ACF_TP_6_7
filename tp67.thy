@@ -293,9 +293,99 @@ where
 "san5 _ = True"
 
 
+
+
+
+datatype abstract = Any | Defined int
+fun abs_plus::"abstract \<Rightarrow> abstract \<Rightarrow> abstract"
+where
+"abs_plus Any _ = Any" |
+"abs_plus _ Any = Any" |
+"abs_plus (Defined n1) (Defined n2) = Defined (n1+n2)"
+
+fun abs_sub::"abstract \<Rightarrow> abstract \<Rightarrow> abstract"
+where
+"abs_sub Any _ = Any" |
+"abs_sub _ Any = Any" |
+"abs_sub (Defined n1) (Defined n2) = Defined (n1-n2)"
+
+datatype abs_bool = ATrue | AFalse | AAny
+
+fun abs_eq::"abstract \<Rightarrow> abstract \<Rightarrow> abs_bool"
+where
+"abs_eq Any _ = AAny" |
+"abs_eq _ Any = AAny" |
+"abs_eq (Defined a1) (Defined a2) = (if (a1=a2) then ATrue else AFalse)"
+
+type_synonym AsymTable= "(string * abstract) list"
+(* Evaluation abstraite des expressions par rapport a une table abstraite de symboles *)
+fun AevalE:: "expression \<Rightarrow> AsymTable \<Rightarrow> abstract"
+where
+"AevalE (Constant s) e = Defined s" |
+"AevalE (Variable s) e= (case (assoc s e) of None \<Rightarrow> Defined (-1) | Some(y) \<Rightarrow> y)" |
+"AevalE (Sum e1 e2) e= abs_plus (AevalE e1 e)  (AevalE e2 e)" |
+"AevalE (Sub e1 e2) e= abs_sub (AevalE e1 e) (AevalE e2 e)" 
+
+
+(* Evaluation abstraite des conditions par rapport a une table abstraite de symboles *)
+
+fun AevalC:: "condition \<Rightarrow> AsymTable \<Rightarrow> abs_bool"
+where
+"AevalC (Eq e1 e2) t= abs_eq (AevalE e1 t)  (AevalE e2 t)"
+
+
+fun allAny::"AsymTable \<Rightarrow> AsymTable"
+where
+"allAny [] = []" |
+"allAny ((s,a)#t) = ((s, Any)#(allAny t))"
+
+fun BothTables::"AsymTable \<Rightarrow> AsymTable \<Rightarrow> AsymTable"
+where
+"BothTables [] t2 = allAny t2" |
+"BothTables ((s,a)#t) t2 = 
+  (let r = assoc s t2 in 
+    (if r = Some a then (s,a)#(BothTables t t2)
+    else (s,Any)#(BothTables t t2)))"
+
+(* Evaluation abstraite d'un programme par rapport a une table abstraite des symboles, a un flux d'entree et un flux de sortie. 
+   Rend un triplet: nouvelle table des symboles, nouveaux flux d'entree et sortie *)
+fun AevalS:: "statement \<Rightarrow> AsymTable * bool \<Rightarrow> AsymTable * bool"
+where
+"AevalS Skip x=x" |
+"AevalS (Aff s e)  (t,b)=  (((s,(AevalE e t))#t),b)" |
+"AevalS (If c s1 s2)  (t,b)= (let r = AevalC c t in
+  (if (r = ATrue) then (AevalS s1 (t,b)) else 
+    (if (r = AFalse) then (AevalS s2 (t,b))  else
+    (
+       let (t1,b1) = (AevalS s1 (t,b)) in
+       let (t2,b2) = (AevalS s2 (t,b)) in
+       let b3 = b1 \<and> b2 in
+       let t3 = BothTables t1 t2 in
+       (t3,b3)))))"|
+
+"AevalS (Seq s1 s2) (t,b)= 
+    (let (t2,b2)= (AevalS s1 (t,b)) in
+        AevalS s2 (t2,b2))" |
+"AevalS (Read s) (t,b)= (((s,Any)#t),b)" |
+"AevalS (Print e) (t,b)= (t,b)" |
+"AevalS (Exec e) (t,b)= (let r = AevalE e t in 
+                          if (r = Any \<or> r = Defined(0))  then (t,False) else (t,b))"
+
+fun san6::"statement \<Rightarrow> bool"
+where
+"san6 s = (let (t,b) = AevalS s ([],True) in b)" 
+
+
+
+
+
+
+
+
+
 fun safe::"statement \<Rightarrow> bool"
 where
-"safe s = san5 s"
+"safe s = san6 s"
 
 
 
