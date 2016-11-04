@@ -377,6 +377,110 @@ where
 
 
 
+(* abstract values are list of values or any *)
+datatype Labstract = LAny | LDefined "int list"
+
+fun op_list_el::"(int \<Rightarrow> int \<Rightarrow> int) \<Rightarrow> int \<Rightarrow> int list \<Rightarrow> int list"
+where
+"op_list_el bop e [] = []"|
+"op_list_el bop e (h#t) = (bop e h)#(op_list_el bop e t)"
+
+fun op_lists::"(int\<Rightarrow>int\<Rightarrow>int) \<Rightarrow> int list \<Rightarrow> int list \<Rightarrow> int list"
+where
+"op_lists bop [] t2 = []" |
+"op_lists bop (h1#t1) t2 = (op_list_el bop h1 t2) @ (op_lists bop t1 t2)"
+
+
+fun Labs_plus::"Labstract \<Rightarrow> Labstract \<Rightarrow> Labstract"
+where
+"Labs_plus LAny _ = LAny" |
+"Labs_plus _ LAny = LAny" |
+"Labs_plus (LDefined n1) (LDefined n2) = LDefined (op_lists (\<lambda> x y . x+y) n1 n2)"
+
+fun Labs_sub::"Labstract \<Rightarrow> Labstract \<Rightarrow> Labstract"
+where
+"Labs_sub LAny _ = LAny" |
+"Labs_sub _ LAny = LAny" |
+"Labs_sub (LDefined n1) (LDefined n2) = LDefined (op_lists (\<lambda> x y . x-y) n1 n2)"
+
+
+
+fun Labs_eq::"Labstract \<Rightarrow> Labstract \<Rightarrow> abs_bool"
+where
+"Labs_eq LAny _ = AAny" |
+"Labs_eq _ LAny = AAny" |
+"Labs_eq (LDefined [a1]) (LDefined [a2]) = (if (a1=a2) then ATrue else AFalse)"|
+"Labs_eq _ _ = AAny"
+
+type_synonym LAsymTable= "(string * Labstract) list"
+(* Evaluation abstraite des expressions par rapport a une table abstraite de symboles *)
+fun LAevalE:: "expression \<Rightarrow> LAsymTable \<Rightarrow> Labstract"
+where
+"LAevalE (Constant s) e = LDefined [s]" |
+"LAevalE (Variable s) e= (case (assoc s e) of None \<Rightarrow> LDefined [-1] | Some(y) \<Rightarrow> y)" |
+"LAevalE (Sum e1 e2) e= Labs_plus (LAevalE e1 e)  (LAevalE e2 e)" |
+"LAevalE (Sub e1 e2) e= Labs_sub (LAevalE e1 e) (LAevalE e2 e)" 
+
+
+(* Evaluation abstraite des conditions par rapport a une table abstraite de symboles *)
+
+fun LAevalC:: "condition \<Rightarrow> LAsymTable \<Rightarrow> abs_bool"
+where
+"LAevalC (Eq e1 e2) t= Labs_eq (LAevalE e1 t)  (LAevalE e2 t)"
+
+
+fun LallAny::"LAsymTable \<Rightarrow> LAsymTable"
+where
+"LallAny [] = []" |
+"LallAny ((s,a)#t) = ((s, LAny)#(LallAny t))"
+
+fun labstract_union::"Labstract \<Rightarrow>  Labstract \<Rightarrow> Labstract"
+where
+"labstract_union LAny _ = LAny"|
+"labstract_union _ LAny = LAny"|
+"labstract_union (LDefined l1) (LDefined l2) = LDefined (l1 @ l2)"
+
+fun LBothTables::"LAsymTable \<Rightarrow> LAsymTable \<Rightarrow> LAsymTable"
+where
+"LBothTables [] t2 = LallAny t2" |
+"LBothTables ((s,a)#t) t2 = 
+  (let r = assoc s t2 in 
+    if r = None then (s,LAny)#(LBothTables t t2) else
+       if r = Some x then 
+        if x = a then (s,a)#(LBothTables t t2) else
+        (s,(labstract_union x a))#(LBothTables t t2))"
+  
+
+(* Evaluation abstraite d'un programme par rapport a une table abstraite des symboles, a un flux d'entree et un flux de sortie. 
+   Rend un triplet: nouvelle table des symboles, nouveaux flux d'entree et sortie *)
+fun AevalS:: "statement \<Rightarrow> AsymTable * bool \<Rightarrow> AsymTable * bool"
+where
+"AevalS Skip x=x" |
+"AevalS (Aff s e)  (t,b)=  (((s,(AevalE e t))#t),b)" |
+"AevalS (If c s1 s2)  (t,b)= (let r = AevalC c t in
+  (if (r = ATrue) then (AevalS s1 (t,b)) else 
+    (if (r = AFalse) then (AevalS s2 (t,b))  else
+    (
+       let (t1,b1) = (AevalS s1 (t,b)) in
+       let (t2,b2) = (AevalS s2 (t,b)) in
+       let b3 = b1 \<and> b2 in
+       let t3 = BothTables t1 t2 in
+       (t3,b3)))))"|
+
+"AevalS (Seq s1 s2) (t,b)= 
+    (let (t2,b2)= (AevalS s1 (t,b)) in
+        AevalS s2 (t2,b2))" |
+"AevalS (Read s) (t,b)= (((s,Any)#t),b)" |
+"AevalS (Print e) (t,b)= (t,b)" |
+"AevalS (Exec e) (t,b)= (let r = AevalE e t in 
+                          if (r = Any \<or> r = Defined(0))  then (t,False) else (t,b))"
+
+fun san6::"statement \<Rightarrow> bool"
+where
+"san6 s = (let (t,b) = AevalS s ([],True) in b)" 
+
+
+
 
 
 
