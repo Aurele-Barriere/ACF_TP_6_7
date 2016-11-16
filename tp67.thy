@@ -444,40 +444,45 @@ fun LBothTables::"LAsymTable \<Rightarrow> LAsymTable \<Rightarrow> LAsymTable"
 where
 "LBothTables [] t2 = LallAny t2" |
 "LBothTables ((s,a)#t) t2 = 
-  (let r = assoc s t2 in 
-    if r = None then (s,LAny)#(LBothTables t t2) else
-       if r = Some x then 
-        if x = a then (s,a)#(LBothTables t t2) else
-        (s,(labstract_union x a))#(LBothTables t t2))"
-  
-
+  ( case (assoc s t2) of
+  None \<Rightarrow> (s,LAny)#(LBothTables t t2) |
+  Some(x) \<Rightarrow> (if (x=a) then ((s,a)#(LBothTables t t2)) else (s,(labstract_union x a))#(LBothTables t t2)))"
+(*
+(s,LAny)#(LBothTables t t2)))"
+"LBothTables ((s,a)#t) t2 = 
+  (let r = assoc s t2 in (
+    if r = None then (s,LAny)#(LBothTables t t2) 
+      else (
+       if r = Some x then (
+        if x = a then ((s,a)#(LBothTables t t2)) else (
+        (s,(labstract_union x a))#(LBothTables t t2)))))) "
+*)
 (* Evaluation abstraite d'un programme par rapport a une table abstraite des symboles, a un flux d'entree et un flux de sortie. 
    Rend un triplet: nouvelle table des symboles, nouveaux flux d'entree et sortie *)
-fun AevalS:: "statement \<Rightarrow> AsymTable * bool \<Rightarrow> AsymTable * bool"
+fun LAevalS:: "statement \<Rightarrow> LAsymTable * bool \<Rightarrow> LAsymTable * bool"
 where
-"AevalS Skip x=x" |
-"AevalS (Aff s e)  (t,b)=  (((s,(AevalE e t))#t),b)" |
-"AevalS (If c s1 s2)  (t,b)= (let r = AevalC c t in
-  (if (r = ATrue) then (AevalS s1 (t,b)) else 
-    (if (r = AFalse) then (AevalS s2 (t,b))  else
+"LAevalS Skip x=x" |
+"LAevalS (Aff s e)  (t,b)=  (((s,(LAevalE e t))#t),b)" |
+"LAevalS (If c s1 s2)  (t,b)= (let r = LAevalC c t in
+  (if (r = ATrue) then (LAevalS s1 (t,b)) else 
+    (if (r = AFalse) then (LAevalS s2 (t,b))  else
     (
-       let (t1,b1) = (AevalS s1 (t,b)) in
-       let (t2,b2) = (AevalS s2 (t,b)) in
+       let (t1,b1) = (LAevalS s1 (t,b)) in
+       let (t2,b2) = (LAevalS s2 (t,b)) in
        let b3 = b1 \<and> b2 in
-       let t3 = BothTables t1 t2 in
+       let t3 = LBothTables t1 t2 in
        (t3,b3)))))"|
+"LAevalS (Seq s1 s2) (t,b)= 
+    (let (t2,b2)= (LAevalS s1 (t,b)) in
+        LAevalS s2 (t2,b2))" |
+"LAevalS (Read s) (t,b)= (((s,LAny)#t),b)" |
+"LAevalS (Print e) (t,b)= (t,b)" |
+"LAevalS (Exec e) (t,b)= (let r = LAevalE e t in 
+                          if (r = LAny \<or> r = LDefined([0]))  then (t,False) else (t,b))"
 
-"AevalS (Seq s1 s2) (t,b)= 
-    (let (t2,b2)= (AevalS s1 (t,b)) in
-        AevalS s2 (t2,b2))" |
-"AevalS (Read s) (t,b)= (((s,Any)#t),b)" |
-"AevalS (Print e) (t,b)= (t,b)" |
-"AevalS (Exec e) (t,b)= (let r = AevalE e t in 
-                          if (r = Any \<or> r = Defined(0))  then (t,False) else (t,b))"
-
-fun san6::"statement \<Rightarrow> bool"
+fun san7::"statement \<Rightarrow> bool"
 where
-"san6 s = (let (t,b) = AevalS s ([],True) in b)" 
+"san7 s = (let (t,b) = LAevalS s ([],True) in b)" 
 
 
 
@@ -489,7 +494,7 @@ where
 
 fun safe::"statement \<Rightarrow> bool"
 where
-"safe s = san6 s"
+"safe s = san7 s"
 
 
 
