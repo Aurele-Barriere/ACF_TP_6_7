@@ -72,6 +72,11 @@ where
 "assoc _ [] = None" |
 "assoc x1 ((x,y)#xs)= (if x=x1 then Some(y) else (assoc x1 xs))"
 
+fun member:: "'a \<Rightarrow> ('a list) \<Rightarrow> bool"
+where
+"member _ [] = False" |
+"member x (h#t) = (if x = h then True else (member x t))"
+
 (* Exemples de recherche dans une table de symboles *)
 
 value "assoc ''x'' st1"     (* quand la variable est dans la table st1 *)
@@ -478,7 +483,11 @@ where
 "LAevalS (Read s) (t,b)= (((s,LAny)#t),b)" |
 "LAevalS (Print e) (t,b)= (t,b)" |
 "LAevalS (Exec e) (t,b)= (let r = LAevalE e t in 
-                          if (r = LAny \<or> r = LDefined([0]))  then (t,False) else (t,b))"
+  (case r of
+  LAny \<Rightarrow> (t,False) |
+  LDefined(list) \<Rightarrow> (if member 0 list then (t,False) else (t,b))))"                          
+
+(*if (r = LAny \<or> (r = LDefined() \<and>   )   )  then (t,False) else (t,b))"*)
 
 fun san7::"statement \<Rightarrow> bool"
 where

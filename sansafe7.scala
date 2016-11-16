@@ -110,14 +110,6 @@ abstract sealed class Labstract
 final case class LAny() extends Labstract
 final case class LDefined(a: List[Int.int]) extends Labstract
 
-def equal_Labstract(x0: Labstract, x1: Labstract): Boolean = (x0, x1) match {
-  case (LAny(), LDefined(list)) => false
-  case (LDefined(list), LAny()) => false
-  case (LDefined(lista), LDefined(list)) =>
-    Lista.equal_lista[Int.int](lista, list)
-  case (LAny(), LAny()) => true
-}
-
 def equal_abs_bool(x0: abs_bool, x1: abs_bool): Boolean = (x0, x1) match {
   case (AFalse(), AAny()) => false
   case (AAny(), AFalse()) => false
@@ -128,6 +120,14 @@ def equal_abs_bool(x0: abs_bool, x1: abs_bool): Boolean = (x0, x1) match {
   case (AAny(), AAny()) => true
   case (AFalse(), AFalse()) => true
   case (ATrue(), ATrue()) => true
+}
+
+def equal_Labstract(x0: Labstract, x1: Labstract): Boolean = (x0, x1) match {
+  case (LAny(), LDefined(list)) => false
+  case (LDefined(list), LAny()) => false
+  case (LDefined(lista), LDefined(list)) =>
+    Lista.equal_lista[Int.int](lista, list)
+  case (LAny(), LAny()) => true
 }
 
 def labstract_union(x0: Labstract, uu: Labstract): Labstract = (x0, uu) match {
@@ -227,6 +227,11 @@ def LAevalC(x0: condition, t: List[(List[Char], Labstract)]): abs_bool = (x0, t)
   case (Eq(e1, e2), t) => Labs_eq(LAevalE(e1, t), LAevalE(e2, t))
 }
 
+def member[A : HOL.equal](uu: A, x1: List[A]): Boolean = (uu, x1) match {
+  case (uu, Nil) => false
+  case (x, h :: t) => (if (HOL.eq[A](x, h)) true else member[A](x, t))
+}
+
 def LAevalS(xa0: statement, x: (List[(List[Char], Labstract)], Boolean)):
       (List[(List[Char], Labstract)], Boolean)
   =
@@ -258,12 +263,11 @@ def LAevalS(xa0: statement, x: (List[(List[Char], Labstract)], Boolean)):
   case (Read(s), (t, b)) => ((s, LAny()) :: t, b)
   case (Print(e), (t, b)) => (t, b)
   case (Exec(e), (t, b)) =>
-    {
-      val r: Labstract = LAevalE(e, t);
-      (if (equal_Labstract(r, LAny()) ||
-             equal_Labstract(r, LDefined(List(Int.zero_int))))
-        (t, false) else (t, b))
-    }
+    (LAevalE(e, t) match {
+       case LAny() => (t, false)
+       case LDefined(list) =>
+         (if (member[Int.int](Int.zero_int, list)) (t, false) else (t, b))
+     })
 }
 
 def san7(s: statement): Boolean =
